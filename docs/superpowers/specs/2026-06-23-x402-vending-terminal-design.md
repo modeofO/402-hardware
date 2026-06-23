@@ -12,37 +12,37 @@ Chosen for built-in WiFi, sufficient RAM for QR rendering on a 480x320 display, 
 
 ## Components (Breadboard Prototype)
 
-| Component | Specification | Purpose |
-|-----------|--------------|---------|
-| ESP32-S3 dev board | ESP32-S3-DevKitC or equivalent | Main MCU — WiFi, processing, GPIO |
-| 3.5" TFT display | ILI9488, 480x320, SPI interface | QR code display for customer |
-| 5V relay module | Single-channel, optoisolated | Generic vend trigger output |
-| USB-C cable | Data + power | Power and flashing via dev board |
-| Breadboard | Full-size | Prototyping connections |
-| Jumper wires | Male-to-male, male-to-female | Wiring |
+| Component          | Specification                   | Purpose                           |
+| ------------------ | ------------------------------- | --------------------------------- |
+| ESP32-S3 dev board | ESP32-S3-DevKitC or equivalent  | Main MCU — WiFi, processing, GPIO |
+| 3.5" TFT display   | ILI9488, 480x320, SPI interface | QR code display for customer      |
+| 5V relay module    | Single-channel, optoisolated    | Generic vend trigger output       |
+| USB-C cable        | Data + power                    | Power and flashing via dev board  |
+| Breadboard         | Full-size                       | Prototyping connections           |
+| Jumper wires       | Male-to-male, male-to-female    | Wiring                            |
 
 ## Wiring
 
 ### ESP32-S3 → 3.5" TFT Display (SPI)
 
-| ESP32-S3 Pin | Display Pin | Function |
-|-------------|-------------|----------|
-| GPIO 18 | SCK | SPI Clock |
-| GPIO 23 | MOSI | SPI Data |
-| GPIO 5 | CS | Chip Select |
-| GPIO 4 | DC | Data/Command |
-| GPIO 2 | RST | Reset |
-| 3.3V | VCC | Power |
-| GND | GND | Ground |
-| 3.3V | LED | Backlight |
+| ESP32-S3 Pin | Display Pin | Function     |
+| ------------ | ----------- | ------------ |
+| GPIO 18      | SCK         | SPI Clock    |
+| GPIO 23      | MOSI        | SPI Data     |
+| GPIO 5       | CS          | Chip Select  |
+| GPIO 4       | DC          | Data/Command |
+| GPIO 2       | RST         | Reset        |
+| 3.3V         | VCC         | Power        |
+| GND          | GND         | Ground       |
+| 3.3V         | LED         | Backlight    |
 
 ### ESP32-S3 → Relay Module
 
-| ESP32-S3 Pin | Relay Pin | Function |
-|-------------|-----------|----------|
-| GPIO 26 | IN | Trigger signal |
-| 5V (VBUS) | VCC | Relay power |
-| GND | GND | Ground |
+| ESP32-S3 Pin | Relay Pin | Function       |
+| ------------ | --------- | -------------- |
+| GPIO 26      | IN        | Trigger signal |
+| 5V (VBUS)    | VCC       | Relay power    |
+| GND          | GND       | Ground         |
 
 ### Power
 
@@ -56,13 +56,13 @@ Rust, using the esp-rs `std` path for full TCP/IP, TLS, and WiFi support.
 
 ### Crates
 
-| Crate | Purpose |
-|-------|---------|
-| `esp-idf-svc` | WiFi, HTTP client, TLS, event loop, SPI, GPIO |
-| `embedded-graphics` | 2D rendering for the display |
-| `mipidsi` | ILI9488 display driver over SPI |
-| `qrcode` | QR code generation |
-| `defmt` + `defmt-rtt` | Structured logging via RTT |
+| Crate                 | Purpose                                       |
+| --------------------- | --------------------------------------------- |
+| `esp-idf-svc`         | WiFi, HTTP client, TLS, event loop, SPI, GPIO |
+| `embedded-graphics`   | 2D rendering for the display                  |
+| `mipidsi`             | ILI9488 display driver over SPI               |
+| `qrcode`              | QR code generation                            |
+| `defmt` + `defmt-rtt` | Structured logging via RTT                    |
 
 ### Modules
 
@@ -76,12 +76,12 @@ Rust, using the esp-rs `std` path for full TCP/IP, TLS, and WiFi support.
 IDLE → AWAITING_PAYMENT → CONFIRMING → DISPENSING → IDLE
 ```
 
-| State | Behavior |
-|-------|----------|
-| IDLE | Display "Ready" / idle screen |
-| AWAITING_PAYMENT | Generate x402 payment URI, render QR code on display |
-| CONFIRMING | Poll/listen for on-chain USDC payment confirmation |
-| DISPENSING | Fire relay GPIO high for configurable duration, display "Dispensing..." |
+| State            | Behavior                                                                |
+| ---------------- | ----------------------------------------------------------------------- |
+| IDLE             | Display "Ready" / idle screen                                           |
+| AWAITING_PAYMENT | Generate x402 payment URI, render QR code on display                    |
+| CONFIRMING       | Poll/listen for on-chain USDC payment confirmation                      |
+| DISPENSING       | Fire relay GPIO high for configurable duration, display "Dispensing..." |
 
 ### Toolchain
 
