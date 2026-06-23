@@ -1,0 +1,4 @@
+Item,Qty,Manufacturer,MPN,Description,DigiKey PN,Unit Price (USD),Total (USD)
+1,1,Espressif Systems,ESP32-S3-DEVKITC-1U-N8R8,ESP32-S3 Dev Board (8MB Flash / 8MB PSRAM),1965-ESP32-S3-DEVKITC-1U-N8R8-ND,15.00,15.00
+2,1,Adafruit Industries LLC,2050,3.5" TFT Display 480x320 SPI (HXD8357D),1528-1470-ND,39.95,39.95
+3,1,Adafruit Industries LLC,4409,STEMMA Non-Latching Mini Relay,1528-4409-ND,6.95,6.95
