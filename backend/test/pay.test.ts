@@ -19,6 +19,7 @@ describe("GET /pay/:sessionId", () => {
     expect(paymentRequired.accepts).toHaveLength(1);
     expect(paymentRequired.accepts[0].scheme).toBe("exact");
     expect(paymentRequired.accepts[0].network).toBe("eip155:8453");
+    expect(paymentRequired.accepts[0].extra.name).toBe("USD Coin");
   });
 
   it("returns 404 for unknown session", async () => {

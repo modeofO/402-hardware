@@ -35,7 +35,7 @@ payRouter.get("/pay/:sessionId", (req, res) => {
         payTo,
         maxTimeoutSeconds: 120,
         extra: {
-          name: "USDC",
+          name: "USD Coin",
           version: "2",
         },
       },
@@ -47,5 +47,5 @@ payRouter.get("/pay/:sessionId", (req, res) => {
     "base64"
   );
 
-  res.status(402).set("PAYMENT-REQUIRED", encoded).json(paymentRequired);
+  res.status(402).set("PAYMENT-REQUIRED", encoded).json({});
 });
