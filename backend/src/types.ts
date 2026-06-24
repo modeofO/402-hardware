@@ -10,6 +10,8 @@ export interface Session {
   payment_url: string;
   status: PaymentStatus;
   created_at: number;
+  tx_hash?: string;
+  payer?: string;
 }
 
 export type PaymentStatus = "pending" | "confirmed" | "failed";

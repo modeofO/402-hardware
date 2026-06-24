@@ -27,4 +27,13 @@ export class SessionStore {
       session.status = status;
     }
   }
+
+  confirm(id: string, tx_hash: string, payer: string): void {
+    const session = this.sessions.get(id);
+    if (session) {
+      session.status = "confirmed";
+      session.tx_hash = tx_hash;
+      session.payer = payer;
+    }
+  }
 }
