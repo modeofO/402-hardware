@@ -1,0 +1,15 @@
+[package]
+name = "x402-terminal"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+esp-idf-svc = { version = "0.50", features = ["critical-section"] }
+embedded-graphics = "0.8"
+qrcode = "0.14"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
+
+[build-dependencies]
+embuild = "0.33"
