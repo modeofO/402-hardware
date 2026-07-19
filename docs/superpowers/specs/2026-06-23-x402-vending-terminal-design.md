@@ -86,24 +86,39 @@ Chosen for built-in WiFi, sufficient RAM for QR rendering on a 480x320 display, 
 
 ## Wiring
 
-### ESP32-S3 → 3.5" TFT Display (SPI)
+The display breaks out two interfaces: an SPI header and an 8080-type parallel header. The board ships in SPI mode (solder jumpers on the back select the interface) — wire the SPI side only and leave the parallel side unconnected. Power pins are duplicated on both sides and internally connected; use the SPI side's.
+
+Note on pin choices: the ESP32-S3 has no GPIO 22–25, and on the DEVKITC-1-N32R16V module GPIO 26–32 are used by flash and GPIO 33–37 by the octal PSRAM. SPI pins below are the S3's hardware FSPI defaults; touch pins are on ADC1 (GPIO 1–10).
+
+### ESP32-S3 → 3.5" TFT Display (SPI side)
 
 | ESP32-S3 Pin | Display Pin | Function |
 |-------------|-------------|----------|
-| GPIO 18 | SCK | SPI Clock |
-| GPIO 23 | MOSI | SPI Data |
-| GPIO 5 | CS | Chip Select |
-| GPIO 4 | DC | Data/Command |
-| GPIO 2 | RST | Reset |
-| 3.3V | VCC | Power |
+| GPIO 12 | CLK | SPI Clock |
+| GPIO 11 | MOSI | SPI Data (out) |
+| GPIO 13 | MISO | SPI Data (in, SD/debug — optional) |
+| GPIO 10 | CS | TFT Chip Select |
+| GPIO 9 | D/C | Data/Command |
+| GPIO 14 | RST | Reset |
+| 3.3V | 3-5V (Vin) | Power |
 | GND | GND | Ground |
-| 3.3V | LED | Backlight |
+
+Leave unconnected: **3.3Vo** (regulator output, not an input), **Lite** (backlight, pulled high internally — backlight on by default; wire to a GPIO only if PWM dimming is wanted), **Card CS** (microSD select, unused).
+
+### ESP32-S3 → Resistive Touch (same SPI-side header)
+
+| ESP32-S3 Pin | Display Pin | Function |
+|-------------|-------------|----------|
+| GPIO 4 | Y+ | Touch sense (ADC1) |
+| GPIO 5 | X+ | Touch sense (ADC1) |
+| GPIO 6 | Y- | Touch drive |
+| GPIO 7 | X- | Touch drive |
 
 ### ESP32-S3 → Relay Module
 
 | ESP32-S3 Pin | Relay Pin | Function |
 |-------------|-----------|----------|
-| GPIO 26 | IN | Trigger signal |
+| GPIO 21 | IN | Trigger signal |
 | 5V (VBUS) | VCC | Relay power |
 | GND | GND | Ground |
 

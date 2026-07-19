@@ -1,5 +1,6 @@
 mod api;
 mod display;
+mod pins;
 mod touch;
 mod types;
 mod vend;
