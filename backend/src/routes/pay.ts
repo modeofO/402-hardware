@@ -6,6 +6,7 @@ import {
 } from "@x402/core/http";
 import { SettleError } from "@x402/core/types";
 import type { SessionStore } from "../session-store.js";
+import { renderCheckoutPage, renderPaidPage } from "../checkout.js";
 import {
   USDC_BASE,
   BASE_NETWORK,
@@ -25,8 +26,14 @@ payRouter.get("/pay/:sessionId", async (req, res) => {
     return;
   }
 
+  const wantsHtml = (req.headers.accept || "").includes("text/html");
+
   if (session.status === "confirmed") {
-    res.status(200).json({ status: "already paid" });
+    if (wantsHtml) {
+      res.status(200).type("html").send(renderPaidPage(session));
+    } else {
+      res.status(200).json({ status: "already paid" });
+    }
     return;
   }
 
@@ -53,6 +60,20 @@ payRouter.get("/pay/:sessionId", async (req, res) => {
 
   const signatureHeader =
     req.headers["payment-signature"] || req.headers["PAYMENT-SIGNATURE"];
+
+  // Browsers (QR scans) get an interactive checkout page that produces
+  // the PAYMENT-SIGNATURE via the wallet's dapp browser; x402 clients
+  // keep the bare protocol response below.
+  if (!signatureHeader && wantsHtml) {
+    res.status(200).type("html").send(
+      renderCheckoutPage({
+        session,
+        paymentRequirements,
+        x402Version: X402_VERSION,
+      })
+    );
+    return;
+  }
 
   if (!signatureHeader) {
     const paymentRequired = {
@@ -144,4 +165,22 @@ payRouter.get("/pay/:sessionId", async (req, res) => {
       message: err instanceof Error ? err.message : "Unknown error",
     });
   }
+});
+
+// Dev-only: fake a confirmed payment so the terminal flow (poll ->
+// dispense) can be tested end-to-end without settling real funds.
+// Enabled only when ENABLE_DEV_CONFIRM=1; hidden otherwise.
+payRouter.post("/pay/:sessionId/dev-confirm", (req, res) => {
+  if (process.env.ENABLE_DEV_CONFIRM !== "1") {
+    res.status(404).json({ error: "not found" });
+    return;
+  }
+  const store = req.app.locals.store as SessionStore;
+  const session = store.get(req.params.sessionId);
+  if (!session) {
+    res.status(404).json({ error: "session not found" });
+    return;
+  }
+  store.confirm(req.params.sessionId, "0xdev-confirm", "0xdev-confirm");
+  res.json({ status: "confirmed" });
 });
