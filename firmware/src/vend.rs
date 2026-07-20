@@ -4,7 +4,7 @@ pub struct Vend;
 
 impl Vend {
     pub fn init() -> anyhow::Result<Self> {
-        info!("Vend: stub init (relay on GPIO 26)");
+        info!("Vend: stub init (relay on GPIO {})", crate::pins::RELAY_IN);
         Ok(Self)
     }
 

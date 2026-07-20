@@ -1,7 +1,7 @@
-use esp_idf_svc::wifi::{BlockingWifi, EspWifi};
-use esp_idf_svc::hal::modem::Modem;
 use esp_idf_svc::eventloop::EspSystemEventLoop;
+use esp_idf_svc::hal::modem::Modem;
 use esp_idf_svc::nvs::EspDefaultNvsPartition;
+use esp_idf_svc::wifi::{BlockingWifi, EspWifi};
 use log::info;
 
 pub fn connect(
@@ -13,10 +13,7 @@ pub fn connect(
 ) -> anyhow::Result<BlockingWifi<EspWifi<'static>>> {
     use esp_idf_svc::wifi::{AuthMethod, ClientConfiguration, Configuration};
 
-    let mut wifi = BlockingWifi::wrap(
-        EspWifi::new(modem, sysloop.clone(), nvs)?,
-        sysloop,
-    )?;
+    let mut wifi = BlockingWifi::wrap(EspWifi::new(modem, sysloop.clone(), nvs)?, sysloop)?;
 
     wifi.set_configuration(&Configuration::Client(ClientConfiguration {
         ssid: ssid.try_into().unwrap(),

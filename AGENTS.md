@@ -18,11 +18,14 @@ Run backend commands from `backend/`:
 - `npm test` runs the Vitest suite once; `npm run test:watch` supports iteration.
 - `npm start` runs the compiled server.
 
-Run firmware commands from `firmware/` after installing the esp-rs `esp` toolchain:
+Run firmware commands from `firmware/` after installing the esp-rs `esp` toolchain (`espup install`, plus `probe-rs`, `espflash`, `ldproxy`, and Python on PATH):
 
 - `cargo build` compiles the ESP-IDF firmware.
 - `cargo fmt --check` verifies Rust formatting; `cargo fmt` applies it.
 - `cargo check` provides a faster compile-time validation pass.
+- `cargo run` flashes over the ESP32-S3's built-in USB-JTAG via probe-rs; watch logs with `espflash monitor` (USB-Serial-JTAG console).
+
+On Windows, before building, source `%USERPROFILE%\export-esp.ps1` and set `ESP_IDF_TOOLS_INSTALL_DIR=global` plus a short `CARGO_TARGET_DIR` (e.g. `C:\esp\t`) — the ESP-IDF CMake build fails with "Too long output directory" under a normal project path.
 
 ## Coding Style & Naming Conventions
 

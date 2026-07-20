@@ -3,6 +3,10 @@ target = "xtensa-esp32s3-espidf"
 
 [target.xtensa-esp32s3-espidf]
 linker = "ldproxy"
+# probe-rs opens this board's USB-JTAG probe but its flash algorithm times
+# out on the N32R16V's 32MB octal flash — flash with espflash instead and
+# keep probe-rs for halting/debugging. Logs arrive on the USB-Serial-JTAG
+# console, which the monitor flag attaches to after flashing.
 runner = "espflash flash --monitor"
 
 [unstable]
@@ -11,3 +15,4 @@ build-std = ["std", "panic_abort"]
 [env]
 MCU = "esp32s3"
 ESP_IDF_VERSION = "v5.3"
+ESP_IDF_SDKCONFIG_DEFAULTS = { value = "sdkconfig.defaults", relative = true }

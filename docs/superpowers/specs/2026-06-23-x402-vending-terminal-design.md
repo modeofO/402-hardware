@@ -86,7 +86,7 @@ Chosen for built-in WiFi, sufficient RAM for QR rendering on a 480x320 display, 
 
 ## Wiring
 
-The display breaks out two interfaces: an SPI header and an 8080-type parallel header. The board ships in SPI mode (solder jumpers on the back select the interface) — wire the SPI side only and leave the parallel side unconnected. Power pins are duplicated on both sides and internally connected; use the SPI side's.
+The display breaks out two interfaces: an SPI header and an 8080-type parallel header. **The board ships in 8-bit parallel mode** — to select SPI, tie IM2 to 3.3V: either solder closed the IM2 jumper on the back of the PCB, or run a jumper wire from the IM2 breakout pin to the 3.3Vo pin (never 5V). Wire the SPI side only and leave the rest of the parallel side unconnected. Power pins are duplicated on both sides and internally connected; use the SPI side's.
 
 Note on pin choices: the ESP32-S3 has no GPIO 22–25, and on the DEVKITC-1-N32R16V module GPIO 26–32 are used by flash and GPIO 33–37 by the octal PSRAM. SPI pins below are the S3's hardware FSPI defaults; touch pins are on ADC1 (GPIO 1–10).
 
@@ -96,7 +96,7 @@ Note on pin choices: the ESP32-S3 has no GPIO 22–25, and on the DEVKITC-1-N32R
 |-------------|-------------|----------|
 | GPIO 12 | CLK | SPI Clock |
 | GPIO 11 | MOSI | SPI Data (out) |
-| GPIO 13 | MISO | SPI Data (in, SD/debug — optional) |
+| — | MISO | Leave unconnected — routing a MISO pin into the ESP32 SPI driver made the panel ignore all traffic (bring-up finding, root cause unclear); the display is driven write-only |
 | GPIO 10 | CS | TFT Chip Select |
 | GPIO 9 | D/C | Data/Command |
 | GPIO 14 | RST | Reset |
@@ -137,10 +137,10 @@ Rust, using the esp-rs `std` path for full TCP/IP, TLS, and WiFi support.
 | Crate | Purpose |
 |-------|---------|
 | `esp-idf-svc` | WiFi, HTTP client, TLS, event loop, SPI, GPIO |
-| `embedded-graphics` | 2D rendering for the display |
-| `mipidsi` | HXD8357D display driver over SPI |
+| `embedded-graphics` | 2D rendering into a PSRAM framebuffer |
 | `qrcode` | QR code generation |
-| `defmt` + `defmt-rtt` | Structured logging via RTT |
+
+(`mipidsi` was originally planned but has no HX8357D model — `display.rs` implements a small custom driver instead: Adafruit's init sequence, full-frame PSRAM framebuffer, manual CS, write-only SPI. Logging goes through `esp-idf-svc`'s `EspLogger` on the USB-Serial-JTAG console rather than defmt/RTT.)
 
 ### Modules
 
