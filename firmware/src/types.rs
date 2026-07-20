@@ -25,13 +25,3 @@ pub enum PaymentStatus {
 pub struct SessionStatus {
     pub status: PaymentStatus,
 }
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum TerminalState {
-    Boot,
-    FetchMenu,
-    Idle,
-    ItemSelected(usize),
-    AwaitingPayment(String),
-    Dispensing,
-}

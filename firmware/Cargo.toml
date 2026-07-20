@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 esp-idf-svc = { version = "0.50", features = ["critical-section"] }
+embedded-svc = "0.28"
 embedded-graphics = "0.8"
 qrcode = "0.14"
 serde = { version = "1", features = ["derive"] }
