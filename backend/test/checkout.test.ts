@@ -38,12 +38,28 @@ describe("GET /pay/:sessionId (browser)", () => {
   });
 });
 
+describe("POST /api/session payment_url", () => {
+  afterEach(() => {
+    delete process.env.PUBLIC_BASE_URL;
+  });
+
+  it("uses PUBLIC_BASE_URL when configured", async () => {
+    process.env.PUBLIC_BASE_URL = "http://10.0.0.5:3000";
+    const res = await request(app).post("/api/session").send({ item_id: "1" });
+    expect(res.body.payment_url).toMatch(
+      /^http:\/\/10\.0\.0\.5:3000\/pay\//
+    );
+  });
+});
+
 describe("POST /pay/:sessionId/dev-confirm", () => {
   afterEach(() => {
     delete process.env.ENABLE_DEV_CONFIRM;
   });
 
-  it("is hidden when ENABLE_DEV_CONFIRM is not set", async () => {
+  it("is hidden when ENABLE_DEV_CONFIRM is not enabled", async () => {
+    // explicit off — a local .env may set it for dev
+    process.env.ENABLE_DEV_CONFIRM = "0";
     const sessionId = await createSession();
     const res = await request(app).post(`/pay/${sessionId}/dev-confirm`);
     expect(res.status).toBe(404);

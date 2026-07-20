@@ -20,7 +20,10 @@ sessionRouter.post("/session", (req, res) => {
 
   const item = MENU.find((m) => m.id === item_id)!;
   const store = req.app.locals.store as SessionStore;
-  const baseUrl = `${req.protocol}://${req.get("host")}`;
+  // Host-header derivation loses the port with some clients (the ESP32's
+  // HTTP client sends "Host: <ip>" bare) — prefer explicit configuration.
+  const baseUrl =
+    process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
   const session = store.create(item, baseUrl);
 
   res.status(201).json({
