@@ -214,6 +214,8 @@ WiFi only. The ESP32-S3 connects to a configured network on boot. WiFi credentia
 
 ## Future (Out of Scope for Prototype)
 
+- WiFi provisioning mode (SoftAP/BLE setup storing creds in NVS) instead of build-time env vars — prototype currently bakes credentials into the binary
+- Flash encryption + NVS encryption + secure boot on production hardware (irreversible eFuse burns — do not enable on the dev board)
 - Custom PCB design (KiCad)
 - Enclosure / mounting
 - Cellular fallback
