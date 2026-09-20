@@ -6,7 +6,7 @@
 
 ## Project Structure & Module Organization
 
-This repository builds an x402-enabled vending terminal. `backend/` contains the TypeScript/Express service: application code lives in `backend/src/`, route handlers in `backend/src/routes/`, and Vitest/Supertest integration tests in `backend/test/`. `firmware/` contains the Rust ESP32-S3 application; keep hardware concerns separated across `src/api.rs`, `display.rs`, `touch.rs`, `vend.rs`, and `wifi.rs`. The system design and payment flow are documented in `docs/superpowers/specs/`. Update `bom.md` when hardware selections change.
+This repository started as an x402-enabled vending terminal (`main`); the `lamp-timer` branch repurposes the same hardware as a countdown timer for a lamp. `backend/` contains the TypeScript/Express x402 service (unused by the timer): application code lives in `backend/src/`, route handlers in `backend/src/routes/`, and Vitest/Supertest integration tests in `backend/test/`. `firmware/` contains the Rust ESP32-S3 application; keep hardware concerns separated across `src/display.rs`, `touch.rs`, and `relay.rs`, with pure countdown logic in `timer.rs` and the shared screen layout in `ui.rs`. Designs live in `docs/superpowers/specs/` (timer: `2026-09-14-lamp-timer-design.md`). **Read `docs/hardware-notes.md` before changing display, touch, or wiring** — it records the bring-up findings (parallel-mode jumper, no-MISO, manual CS, big-endian RGB565) that were expensive to learn. Update `bom.md` when hardware selections change.
 
 ## Build, Test, and Development Commands
 

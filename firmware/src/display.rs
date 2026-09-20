@@ -12,6 +12,8 @@
 //! and the SPI bus must be created WITHOUT a MISO pin — routing GPIO13 as
 //! MISO made the panel ignore everything (probe-verified; root cause in
 //! the esp-idf full-duplex path unclear). The panel is write-only here.
+//! Pixel bytes go out big-endian (RGB565 high byte first) — see
+//! docs/hardware-notes.md for the full bring-up story.
 
 use anyhow::Result;
 use embedded_graphics::{
@@ -25,6 +27,9 @@ use esp_idf_svc::hal::delay::FreeRtos;
 use esp_idf_svc::hal::gpio::{AnyOutputPin, Output, PinDriver};
 use esp_idf_svc::hal::spi::{SpiDeviceDriver, SpiDriver};
 use log::info;
+
+use crate::timer::Phase;
+use crate::ui;
 
 pub const WIDTH: usize = 480;
 pub const HEIGHT: usize = 320;
@@ -176,88 +181,130 @@ impl Display {
         let _ = self.flush();
     }
 
-    pub fn show_menu(&mut self, items: &[crate::types::MenuItem]) {
-        info!("Display: showing {} menu items", items.len());
+    /// Full timer screen: countdown digits, status line, buttons.
+    pub fn show_timer(&mut self, remaining_secs: u64, phase: Phase) {
         self.clear(Rgb565::BLACK);
 
-        let title = MonoTextStyle::new(&FONT_10X20, Rgb565::CSS_GOLD);
+        let (digit_color, status, status_color) = match phase {
+            Phase::Running => (Rgb565::GREEN, "LAMP ON", Rgb565::GREEN),
+            Phase::Idle if remaining_secs > 0 => (Rgb565::WHITE, "LAMP OFF", Rgb565::CSS_GRAY),
+            Phase::Idle => (Rgb565::CSS_DIM_GRAY, "SET A TIME", Rgb565::CSS_GRAY),
+            Phase::Done => (Rgb565::CSS_ORANGE, "DONE - LAMP OFF", Rgb565::CSS_ORANGE),
+        };
+        self.draw_countdown(remaining_secs, digit_color);
+
         let _ = Text::with_alignment(
-            "TAP AN ITEM TO PAY WITH USDC",
-            Point::new(WIDTH as i32 / 2, 34),
-            title,
+            status,
+            Point::new(WIDTH as i32 / 2, ui::STATUS_BASELINE),
+            MonoTextStyle::new(&FONT_10X20, status_color),
             Alignment::Center,
         )
         .draw(self);
 
-        let label = MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE);
-        for (i, item) in items.iter().enumerate() {
-            let rect = Self::item_hitbox(i);
-            let _ = rect
-                .into_styled(PrimitiveStyle::with_fill(Rgb565::new(6, 12, 12)))
-                .draw(self);
-            let cy = rect.top_left.y + rect.size.height as i32 / 2 + 7;
-            let _ = Text::new(&item.name, Point::new(rect.top_left.x + 24, cy), label).draw(self);
-            let price = format!("{} USDC", item.price_usdc);
-            let _ = Text::with_alignment(
-                &price,
-                Point::new(rect.top_left.x + rect.size.width as i32 - 24, cy),
-                label,
-                Alignment::Right,
-            )
-            .draw(self);
+        let running = phase == Phase::Running;
+        for button in ui::Button::ALL {
+            let fill = match button {
+                ui::Button::StartStop if running => Rgb565::new(20, 8, 4),
+                ui::Button::StartStop if remaining_secs > 0 => Rgb565::new(2, 28, 6),
+                ui::Button::StartStop => Rgb565::new(4, 8, 4),
+                _ => Rgb565::new(6, 12, 12),
+            };
+            self.draw_button(button.rect(WIDTH as i32), button.label(running), fill);
         }
         let _ = self.flush();
     }
 
-    /// Button rect for menu item `i` — shared with touch mapping.
-    pub fn item_hitbox(i: usize) -> Rectangle {
-        Rectangle::new(
-            Point::new(20, 60 + i as i32 * 82),
-            Size::new(WIDTH as u32 - 40, 72),
+    fn draw_button(&mut self, rect: Rectangle, label: &str, fill: Rgb565) {
+        let _ = rect.into_styled(PrimitiveStyle::with_fill(fill)).draw(self);
+        let center = rect.center();
+        let _ = Text::with_alignment(
+            label,
+            Point::new(center.x, center.y + 7),
+            MonoTextStyle::new(&FONT_10X20, Rgb565::WHITE),
+            Alignment::Center,
         )
+        .draw(self);
     }
 
-    pub fn show_qr(&mut self, data: &str) {
-        info!("Display: QR code for {}", data);
-        self.clear(Rgb565::WHITE);
+    /// Seven-segment countdown, centred: MM:SS under an hour, else H:MM:SS.
+    fn draw_countdown(&mut self, secs: u64, color: Rgb565) {
+        let h = secs / 3600;
+        let m = (secs % 3600) / 60;
+        let s = secs % 60;
+        // None = colon
+        let mut glyphs: Vec<Option<u8>> = Vec::with_capacity(7);
+        if h > 0 {
+            glyphs.push(Some((h % 10) as u8));
+            glyphs.push(None);
+        }
+        glyphs.extend([
+            Some((m / 10) as u8),
+            Some((m % 10) as u8),
+            None,
+            Some((s / 10) as u8),
+            Some((s % 10) as u8),
+        ]);
 
-        match qrcode::QrCode::new(data.as_bytes()) {
-            Ok(code) => {
-                let modules = code.width();
-                let quiet = 4;
-                let scale = ((HEIGHT - 40) / (modules + 2 * quiet)).max(1);
-                let side = (modules + 2 * quiet) * scale;
-                let ox = (WIDTH - side) as i32 / 2;
-                let oy = (HEIGHT - side) as i32 / 2;
-                let colors = code.to_colors();
-                for (idx, c) in colors.iter().enumerate() {
-                    if *c == qrcode::Color::Dark {
-                        let mx = (idx % modules + quiet) * scale;
-                        let my = (idx / modules + quiet) * scale;
-                        let _ = Rectangle::new(
-                            Point::new(ox + mx as i32, oy + my as i32),
-                            Size::new(scale as u32, scale as u32),
-                        )
-                        .into_styled(PrimitiveStyle::with_fill(Rgb565::BLACK))
-                        .draw(self);
-                    }
+        const DIGIT_W: i32 = 64;
+        const COLON_W: i32 = 24;
+        const GAP: i32 = 12;
+        const THICK: i32 = 12;
+        let height = ui::DIGITS_HEIGHT as i32;
+        let total: i32 = glyphs
+            .iter()
+            .map(|g| if g.is_some() { DIGIT_W } else { COLON_W })
+            .sum::<i32>()
+            + GAP * (glyphs.len() as i32 - 1);
+        let mut x = (WIDTH as i32 - total) / 2;
+        let y = ui::DIGITS_TOP;
+        for g in glyphs {
+            match g {
+                Some(d) => {
+                    self.draw_seven_seg(x, y, DIGIT_W, height, THICK, d, color);
+                    x += DIGIT_W + GAP;
                 }
-                let style = MonoTextStyle::new(&FONT_10X20, Rgb565::BLACK);
-                let _ = Text::with_alignment(
-                    "SCAN TO PAY",
-                    Point::new(WIDTH as i32 / 2, 24),
-                    style,
-                    Alignment::Center,
-                )
-                .draw(self);
-            }
-            Err(e) => {
-                log::error!("QR encode failed: {e}");
-                self.show_message("QR error");
-                return;
+                None => {
+                    let cx = x + (COLON_W - THICK) / 2;
+                    for cy in [y + height / 4, y + 3 * height / 4] {
+                        self.fill_rect(cx, cy - THICK / 2, THICK, THICK, color);
+                    }
+                    x += COLON_W + GAP;
+                }
             }
         }
-        let _ = self.flush();
+    }
+
+    /// One digit as lit segments. Bits: a=top, b=top-right, c=bottom-right,
+    /// d=bottom, e=bottom-left, f=top-left, g=middle.
+    fn draw_seven_seg(&mut self, x: i32, y: i32, w: i32, h: i32, t: i32, digit: u8, color: Rgb565) {
+        const SEGMENTS: [u8; 10] = [
+            0b0111111, 0b0000110, 0b1011011, 0b1001111, 0b1100110, 0b1101101, 0b1111101, 0b0000111,
+            0b1111111, 0b1101111,
+        ];
+        let lit = SEGMENTS[(digit % 10) as usize];
+        let mid = y + h / 2;
+        let upper = (y + t, mid - t / 2 - (y + t));
+        let lower = (mid + t / 2, (y + h - t) - (mid + t / 2));
+        let segs = [
+            (x + t, y, w - 2 * t, t),           // a
+            (x + w - t, upper.0, t, upper.1),   // b
+            (x + w - t, lower.0, t, lower.1),   // c
+            (x + t, y + h - t, w - 2 * t, t),   // d
+            (x, lower.0, t, lower.1),           // e
+            (x, upper.0, t, upper.1),           // f
+            (x + t, mid - t / 2, w - 2 * t, t), // g
+        ];
+        for (i, (sx, sy, sw, sh)) in segs.into_iter().enumerate() {
+            if lit & (1 << i) != 0 {
+                self.fill_rect(sx, sy, sw, sh, color);
+            }
+        }
+    }
+
+    fn fill_rect(&mut self, x: i32, y: i32, w: i32, h: i32, color: Rgb565) {
+        let _ = Rectangle::new(Point::new(x, y), Size::new(w as u32, h as u32))
+            .into_styled(PrimitiveStyle::with_fill(color))
+            .draw(self);
     }
 }
 

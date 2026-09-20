@@ -4,8 +4,8 @@
 //! GPIO 26–32 are used by flash, and GPIO 33–37 by the octal PSRAM.
 //! Touch sense pins must be on ADC1 (GPIO 1–10).
 //!
-//! See docs/superpowers/specs/2026-06-23-x402-vending-terminal-design.md
-//! ("Wiring") for the full table.
+//! See docs/superpowers/specs/2026-09-14-lamp-timer-design.md ("Wiring")
+//! for the full table and docs/hardware-notes.md for bring-up findings.
 
 // Constants are consumed as peripherals get implemented.
 #![allow(dead_code)]
@@ -24,5 +24,6 @@ pub const TOUCH_XP: u8 = 5;
 pub const TOUCH_YM: u8 = 6;
 pub const TOUCH_XM: u8 = 7;
 
-// Relay module (Adafruit 2895)
+// Digital Loggers IoT Power Relay: trigger "+" (trigger "-" to GND).
+// Active high, opto-isolated, 3–60V DC input — 3.3V GPIO drives it directly.
 pub const RELAY_IN: u8 = 21;

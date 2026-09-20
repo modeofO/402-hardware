@@ -153,9 +153,4 @@ impl Touch {
             y.clamp(0, crate::display::HEIGHT as i32 - 1),
         ))
     }
-
-    /// Map a touch point to a menu item index.
-    pub fn item_at(point: Point, item_count: usize) -> Option<usize> {
-        (0..item_count).find(|&i| crate::display::Display::item_hitbox(i).contains(point))
-    }
 }
