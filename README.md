@@ -113,7 +113,7 @@ cd firmware
 cargo run --release
 ```
 
-The Cargo runner builds, flashes, and opens the serial monitor. The firmware logs its scaffold state and waits; it does not render the menu or vend an item yet.
+The Cargo runner builds, flashes, and opens the serial monitor. On the `lamp-timer` branch the firmware is a scheduled lamp switch: set the clock and a daily on/off window on the touchscreen (no Wi-Fi needed) and the relay follows it. See the [lamp timer design](docs/superpowers/specs/2026-09-14-lamp-timer-design.md).
 
 ### Windows setup
 

@@ -28,8 +28,9 @@ use esp_idf_svc::hal::gpio::{AnyOutputPin, Output, PinDriver};
 use esp_idf_svc::hal::spi::{SpiDeviceDriver, SpiDriver};
 use log::info;
 
-use crate::timer::Phase;
-use crate::ui;
+use crate::editor::Editor;
+use crate::schedule::{Minutes, Schedule};
+use crate::ui::{self, Button, Layout};
 
 pub const WIDTH: usize = 480;
 pub const HEIGHT: usize = 320;
@@ -57,6 +58,29 @@ const SETGAMMA: u8 = 0xE0;
 
 // MADCTL_MY | MADCTL_MV — landscape 480x320, USB port on the left
 const MADCTL_LANDSCAPE: u8 = 0xA0;
+
+/// Seven-segment glyph index for "-", shown while the clock is unset.
+const DASH: u8 = 10;
+
+const BUTTON_NEUTRAL: Rgb565 = Rgb565::new(6, 12, 12);
+const BUTTON_GO: Rgb565 = Rgb565::new(2, 28, 6);
+const BUTTON_STOP: Rgb565 = Rgb565::new(20, 8, 4);
+
+/// Everything the main screen shows; `main.rs` redraws when it changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MainView {
+    /// None while the clock is unset.
+    pub time: Option<Minutes>,
+    /// Time came from the flash checkpoint and has not been confirmed.
+    pub restored: bool,
+    pub lamp_on: bool,
+    pub manual: bool,
+    pub schedule: Schedule,
+}
+
+fn hhmm(t: Minutes) -> String {
+    format!("{:02}:{:02}", t / 60, t % 60)
+}
 
 pub struct Display {
     spi: SpiDeviceDriver<'static, SpiDriver<'static>>,
@@ -181,37 +205,90 @@ impl Display {
         let _ = self.flush();
     }
 
-    /// Full timer screen: countdown digits, status line, buttons.
-    pub fn show_timer(&mut self, remaining_secs: u64, phase: Phase) {
+    /// Main screen: clock, lamp state, schedule, buttons.
+    pub fn show_main(&mut self, view: &MainView) {
         self.clear(Rgb565::BLACK);
 
-        let (digit_color, status, status_color) = match phase {
-            Phase::Running => (Rgb565::GREEN, "LAMP ON", Rgb565::GREEN),
-            Phase::Idle if remaining_secs > 0 => (Rgb565::WHITE, "LAMP OFF", Rgb565::CSS_GRAY),
-            Phase::Idle => (Rgb565::CSS_DIM_GRAY, "SET A TIME", Rgb565::CSS_GRAY),
-            Phase::Done => (Rgb565::CSS_ORANGE, "DONE - LAMP OFF", Rgb565::CSS_ORANGE),
+        let digit_color = match view.time {
+            None => Rgb565::CSS_DIM_GRAY,
+            Some(_) if view.restored => Rgb565::CSS_ORANGE,
+            Some(_) if view.lamp_on => Rgb565::GREEN,
+            Some(_) => Rgb565::WHITE,
         };
-        self.draw_countdown(remaining_secs, digit_color);
+        self.draw_time(view.time, digit_color);
 
+        let (status, status_color) = match (view.lamp_on, view.manual) {
+            (true, false) => ("LAMP ON", Rgb565::GREEN),
+            (true, true) => ("LAMP ON - MANUAL", Rgb565::GREEN),
+            (false, false) => ("LAMP OFF", Rgb565::CSS_GRAY),
+            (false, true) => ("LAMP OFF - MANUAL", Rgb565::CSS_GRAY),
+        };
+        self.draw_line(status, ui::STATUS_BASELINE, status_color);
+
+        let schedule = format!(
+            "ON {} - OFF {} DAILY",
+            hhmm(view.schedule.on),
+            hhmm(view.schedule.off)
+        );
+        let (detail, detail_color) = match view.time {
+            None => ("CLOCK NOT SET - TAP SET CLOCK", Rgb565::CSS_ORANGE),
+            Some(_) if view.restored => ("POWER WAS LOST - CHECK THE CLOCK", Rgb565::CSS_ORANGE),
+            Some(_) => (schedule.as_str(), Rgb565::CSS_GRAY),
+        };
+        self.draw_line(detail, ui::DETAIL_BASELINE, detail_color);
+
+        for &button in Layout::Main.buttons() {
+            let (label, fill) = match button {
+                Button::LampToggle if view.lamp_on => ("TURN LAMP OFF", BUTTON_STOP),
+                Button::LampToggle => ("TURN LAMP ON", BUTTON_GO),
+                Button::SetClock => ("SET CLOCK", BUTTON_NEUTRAL),
+                _ => ("SCHEDULE", BUTTON_NEUTRAL),
+            };
+            self.draw_button(button.rect(WIDTH as i32), label, fill);
+        }
+        let _ = self.flush();
+    }
+
+    /// Time-entry screen for the clock and both schedule steps.
+    pub fn show_editor(&mut self, editor: &Editor) {
+        self.clear(Rgb565::BLACK);
+        self.draw_time(Some(editor.value()), Rgb565::WHITE);
+
+        let on_at;
+        let (title, detail, confirm) = match editor {
+            Editor::Clock(_) => ("SET CLOCK", "HOLD A BUTTON TO REPEAT", "SAVE"),
+            Editor::LampOn(_) => ("LAMP TURNS ON AT", "HOLD A BUTTON TO REPEAT", "NEXT"),
+            Editor::LampOff { on, .. } => {
+                on_at = format!("TURNS ON AT {}", hhmm(*on));
+                ("LAMP TURNS OFF AT", on_at.as_str(), "SAVE")
+            }
+        };
+        self.draw_line(title, ui::STATUS_BASELINE, Rgb565::WHITE);
+        self.draw_line(detail, ui::DETAIL_BASELINE, Rgb565::CSS_GRAY);
+
+        for &button in Layout::Editor.buttons() {
+            let (label, fill) = match button {
+                Button::HourDown => ("HOUR -", BUTTON_NEUTRAL),
+                Button::HourUp => ("HOUR +", BUTTON_NEUTRAL),
+                Button::MinuteDown => ("MIN -", BUTTON_NEUTRAL),
+                Button::MinuteUp => ("MIN +", BUTTON_NEUTRAL),
+                Button::Cancel => ("CANCEL", BUTTON_STOP),
+                _ => (confirm, BUTTON_GO),
+            };
+            self.draw_button(button.rect(WIDTH as i32), label, fill);
+        }
+        let _ = self.flush();
+    }
+
+    /// One centred line of text.
+    fn draw_line(&mut self, text: &str, baseline: i32, color: Rgb565) {
         let _ = Text::with_alignment(
-            status,
-            Point::new(WIDTH as i32 / 2, ui::STATUS_BASELINE),
-            MonoTextStyle::new(&FONT_10X20, status_color),
+            text,
+            Point::new(WIDTH as i32 / 2, baseline),
+            MonoTextStyle::new(&FONT_10X20, color),
             Alignment::Center,
         )
         .draw(self);
-
-        let running = phase == Phase::Running;
-        for button in ui::Button::ALL {
-            let fill = match button {
-                ui::Button::StartStop if running => Rgb565::new(20, 8, 4),
-                ui::Button::StartStop if remaining_secs > 0 => Rgb565::new(2, 28, 6),
-                ui::Button::StartStop => Rgb565::new(4, 8, 4),
-                _ => Rgb565::new(6, 12, 12),
-            };
-            self.draw_button(button.rect(WIDTH as i32), button.label(running), fill);
-        }
-        let _ = self.flush();
     }
 
     fn draw_button(&mut self, rect: Rectangle, label: &str, fill: Rgb565) {
@@ -226,24 +303,18 @@ impl Display {
         .draw(self);
     }
 
-    /// Seven-segment countdown, centred: MM:SS under an hour, else H:MM:SS.
-    fn draw_countdown(&mut self, secs: u64, color: Rgb565) {
-        let h = secs / 3600;
-        let m = (secs % 3600) / 60;
-        let s = secs % 60;
+    /// Seven-segment HH:MM, centred; dashes while the clock is unset.
+    fn draw_time(&mut self, time: Option<Minutes>, color: Rgb565) {
+        let digit = |d: Minutes| Some(if time.is_some() { d as u8 } else { DASH });
+        let t = time.unwrap_or(0);
         // None = colon
-        let mut glyphs: Vec<Option<u8>> = Vec::with_capacity(7);
-        if h > 0 {
-            glyphs.push(Some((h % 10) as u8));
-            glyphs.push(None);
-        }
-        glyphs.extend([
-            Some((m / 10) as u8),
-            Some((m % 10) as u8),
+        let glyphs = [
+            digit(t / 60 / 10),
+            digit(t / 60 % 10),
             None,
-            Some((s / 10) as u8),
-            Some((s % 10) as u8),
-        ]);
+            digit(t % 60 / 10),
+            digit(t % 60 % 10),
+        ];
 
         const DIGIT_W: i32 = 64;
         const COLON_W: i32 = 24;
@@ -274,14 +345,14 @@ impl Display {
         }
     }
 
-    /// One digit as lit segments. Bits: a=top, b=top-right, c=bottom-right,
-    /// d=bottom, e=bottom-left, f=top-left, g=middle.
+    /// One digit (or `DASH`) as lit segments. Bits: a=top, b=top-right,
+    /// c=bottom-right, d=bottom, e=bottom-left, f=top-left, g=middle.
     fn draw_seven_seg(&mut self, x: i32, y: i32, w: i32, h: i32, t: i32, digit: u8, color: Rgb565) {
-        const SEGMENTS: [u8; 10] = [
+        const SEGMENTS: [u8; 11] = [
             0b0111111, 0b0000110, 0b1011011, 0b1001111, 0b1100110, 0b1101101, 0b1111101, 0b0000111,
-            0b1111111, 0b1101111,
+            0b1111111, 0b1101111, 0b1000000,
         ];
-        let lit = SEGMENTS[(digit % 10) as usize];
+        let lit = SEGMENTS[digit as usize % SEGMENTS.len()];
         let mid = y + h / 2;
         let upper = (y + t, mid - t / 2 - (y + t));
         let lower = (mid + t / 2, (y + h - t) - (mid + t / 2));
