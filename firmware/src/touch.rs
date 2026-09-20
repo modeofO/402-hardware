@@ -28,7 +28,7 @@ const Z_THRESHOLD: i32 = 100;
 /// Panel raw axes vs. our landscape orientation (MADCTL 0xA0).
 /// Adjust after on-device calibration.
 const SWAP_XY: bool = true;
-const INVERT_X: bool = false;
+const INVERT_X: bool = true;
 const INVERT_Y: bool = false;
 
 pub struct Touch {
