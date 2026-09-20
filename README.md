@@ -115,6 +115,31 @@ cargo run --release
 
 The Cargo runner builds, flashes, and opens the serial monitor. The firmware logs its scaffold state and waits; it does not render the menu or vend an item yet.
 
+### Windows setup
+
+On Windows, run these in every new PowerShell session before `cargo build` or `cargo run`:
+
+```powershell
+. $env:USERPROFILE\export-esp.ps1          # Xtensa toolchain paths + LIBCLANG_PATH (written by espup)
+$env:CARGO_TARGET_DIR = "C:\esp\t"         # any short path; create it once
+$env:ESP_IDF_TOOLS_INSTALL_DIR = "global"  # reuse the ESP-IDF tools in ~/.espressif
+```
+
+Python 3 must also be on `PATH`. If it was installed per-user without the PATH option, prepend it:
+
+```powershell
+$env:PATH = "$env:LOCALAPPDATA\Programs\Python\Python312;" + $env:PATH
+```
+
+Without the short `CARGO_TARGET_DIR`, the ESP-IDF CMake build fails with `Too long output directory`, because the default `firmware\target\...` path exceeds its length limit. With it set, build output lands under that directory instead, so to flash without opening the monitor:
+
+```powershell
+cargo build --release
+espflash flash C:\esp\t\xtensa-esp32s3-espidf\release\lamp-timer
+```
+
+The board should enumerate as `USB JTAG/serial debug unit` (VID `303A`, PID `1001`). If espflash cannot connect, hold BOOT, tap RESET, and release BOOT to force ROM download mode. Read logs with `espflash monitor`; a plain serial terminal that toggles DTR/RTS resets the chip into download mode.
+
 See the [design specification](docs/superpowers/specs/2026-06-23-x402-vending-terminal-design.md) for the state machine, GPIO assignments, wiring, and planned implementation. See the [bill of materials](bom.md) for prototype hardware.
 
 ## Test and validate changes

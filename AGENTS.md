@@ -23,9 +23,9 @@ Run firmware commands from `firmware/` after installing the esp-rs `esp` toolcha
 - `cargo build` compiles the ESP-IDF firmware.
 - `cargo fmt --check` verifies Rust formatting; `cargo fmt` applies it.
 - `cargo check` provides a faster compile-time validation pass.
-- `cargo run` flashes over the ESP32-S3's built-in USB-JTAG via probe-rs; watch logs with `espflash monitor` (USB-Serial-JTAG console).
+- `cargo run` flashes over the ESP32-S3's built-in USB-Serial-JTAG via `espflash flash --monitor` (the configured runner) and attaches to the log console; probe-rs is for halting/debugging only.
 
-On Windows, before building, source `%USERPROFILE%\export-esp.ps1` and set `ESP_IDF_TOOLS_INSTALL_DIR=global` plus a short `CARGO_TARGET_DIR` (e.g. `C:\esp\t`) — the ESP-IDF CMake build fails with "Too long output directory" under a normal project path.
+On Windows, before building, source `%USERPROFILE%\export-esp.ps1` and set `ESP_IDF_TOOLS_INSTALL_DIR=global` plus a short `CARGO_TARGET_DIR` (e.g. `C:\esp\t`) — the ESP-IDF CMake build fails with "Too long output directory" under a normal project path. The exact commands are in the README under "Windows setup".
 
 ## Coding Style & Naming Conventions
 
