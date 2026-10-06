@@ -30,6 +30,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import urllib.parse
@@ -69,9 +70,10 @@ def _friendly_filename(mpn: str, description: str = "") -> str:
 def _get_digikey_token() -> str | None:
     """Get a DigiKey OAuth token, using a cached version if still valid.
 
-    Caches the token to a temp file with a 9-minute TTL (tokens last 10 minutes).
+    Caches the token with a 9-minute TTL (tokens last 10 minutes) in
+    ~/.cache/digikey/, owner-only — not the shared temp dir, where another
+    local user could read the token or plant a file for us to trust.
     """
-    import tempfile
     import time
 
     client_id = os.environ.get("DIGIKEY_CLIENT_ID", "")
@@ -80,11 +82,16 @@ def _get_digikey_token() -> str | None:
         print("Error: DIGIKEY_CLIENT_ID and DIGIKEY_CLIENT_SECRET required", file=sys.stderr)
         return None
 
-    cache_path = os.path.join(tempfile.gettempdir(), "digikey_token_cache.json")
+    cache_dir = os.path.join(os.path.expanduser("~"), ".cache", "digikey")
+    cache_path = os.path.join(cache_dir, "token_cache.json")
 
-    # Check cache
+    # Check cache — only a regular file we own (uid checks are POSIX-only;
+    # on Windows the per-user home directory is the protection)
     try:
-        if os.path.exists(cache_path):
+        st = os.lstat(cache_path) if os.path.exists(cache_path) else None
+        owned = st is not None and stat.S_ISREG(st.st_mode) and (
+            not hasattr(os, "getuid") or st.st_uid == os.getuid())
+        if owned:
             with open(cache_path) as f:
                 cached = json.load(f)
             if (cached.get("client_id") == client_id
@@ -113,14 +120,21 @@ def _get_digikey_token() -> str | None:
             return None
 
         # Cache with 9-minute TTL (token lasts 10 min, 1 min safety margin)
+        # Created 0600 from the start, never through a symlink, then moved
+        # into place so a reader never sees a half-written file.
         try:
-            with open(cache_path, "w") as f:
+            os.makedirs(cache_dir, mode=0o700, exist_ok=True)
+            tmp_path = cache_path + ".tmp"
+            flags = (os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                     | getattr(os, "O_NOFOLLOW", 0))
+            fd = os.open(tmp_path, flags, 0o600)
+            with os.fdopen(fd, "w") as f:
                 json.dump({
                     "token": token,
                     "client_id": client_id,
                     "expires_at": time.time() + 540,
                 }, f)
-            os.chmod(cache_path, 0o600)
+            os.replace(tmp_path, cache_path)
         except OSError:
             pass  # caching is best-effort
 
