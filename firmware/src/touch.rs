@@ -3,8 +3,9 @@
 //! touch detection. Pins swap roles between GPIO-output and ADC-input on
 //! every read, so short-lived drivers borrow the owned pins per phase.
 //!
-//! YP = GPIO4 (ADC1_CH3), XP = GPIO5 (ADC1_CH4),
-//! YM = GPIO6 (drive),    XM = GPIO7 (ADC1_CH6 / drive)
+//! YP = GPIO7 (ADC1_CH6), XP = GPIO6 (ADC1_CH5),
+//! YM = GPIO5 (drive),    XM = GPIO4 (ADC1_CH3 / drive)
+//! — the carrier board's assignment (pins.rs); the breadboard had 4/5/6/7.
 
 use anyhow::Result;
 use embedded_graphics::prelude::Point;
@@ -33,10 +34,10 @@ const INVERT_Y: bool = false;
 
 pub struct Touch {
     adc: AdcDriver<'static, ADC1>,
-    yp: Gpio4,
-    xp: Gpio5,
-    ym: Gpio6,
-    xm: Gpio7,
+    yp: Gpio7,
+    xp: Gpio6,
+    ym: Gpio5,
+    xm: Gpio4,
 }
 
 /// Median-of-3 raw read of one prepared ADC pin.
@@ -55,9 +56,15 @@ fn sample<P: ADCPin<Adc = ADC1>>(adc: &AdcDriver<'static, ADC1>, pin: &mut P) ->
 }
 
 impl Touch {
-    pub fn new(adc1: ADC1, yp: Gpio4, xp: Gpio5, ym: Gpio6, xm: Gpio7) -> Result<Self> {
+    pub fn new(adc1: ADC1, yp: Gpio7, xp: Gpio6, ym: Gpio5, xm: Gpio4) -> Result<Self> {
         let adc = AdcDriver::new(adc1)?;
-        info!("Touch: 4-wire resistive on YP=4 XP=5 YM=6 XM=7");
+        info!(
+            "Touch: 4-wire resistive on YP={} XP={} YM={} XM={}",
+            crate::pins::TOUCH_YP,
+            crate::pins::TOUCH_XP,
+            crate::pins::TOUCH_YM,
+            crate::pins::TOUCH_XM
+        );
         Ok(Self {
             adc,
             yp,

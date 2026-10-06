@@ -72,12 +72,18 @@ fn main() -> Result<()> {
 
     let p = Peripherals::take()?;
 
-    // Display SPI on the S3's FSPI (SPI2) IOMUX pins — see pins.rs.
-    // No MISO: routing GPIO13 into the SPI driver made the panel ignore
+    // Status LED first, so a board that dies during bring-up at least
+    // shows it has power. Solid once the clock is trusted; blinking while
+    // the time is unset or was restored after a power cut (see the loop).
+    let mut led = PinDriver::output(p.pins.gpio45.downgrade_output())?;
+    led.set_high()?;
+
+    // Display SPI on the S3's SPI2 via the GPIO matrix — see pins.rs.
+    // No MISO: routing a MISO pin into the SPI driver made the panel ignore
     // all traffic (see display.rs) — the display is driven write-only.
     let spi_driver = SpiDriver::new(
         p.spi2,
-        p.pins.gpio12, // SCK
+        p.pins.gpio10, // SCK
         p.pins.gpio11, // MOSI
         None::<esp_idf_svc::hal::gpio::AnyIOPin>,
         &SpiDriverConfig::new(),
@@ -87,19 +93,20 @@ fn main() -> Result<()> {
         None::<esp_idf_svc::hal::gpio::AnyOutputPin>, // CS is manual, see display.rs
         &spi_config::Config::new().baudrate(26.MHz().into()),
     )?;
-    let cs = PinDriver::output(p.pins.gpio10.downgrade_output())?;
-    let dc = PinDriver::output(p.pins.gpio9.downgrade_output())?;
-    let rst = PinDriver::output(p.pins.gpio14.downgrade_output())?;
+    let cs = PinDriver::output(p.pins.gpio12.downgrade_output())?;
+    let dc = PinDriver::output(p.pins.gpio14.downgrade_output())?;
+    let rst = PinDriver::output(p.pins.gpio47.downgrade_output())?;
 
     let mut display = Display::new(spi, cs, dc, rst)?;
     display.show_message("Booting...");
 
+    // Touch pins are handed over in YP, XP, YM, XM order — see pins.rs.
     let mut touch = Touch::new(
         p.adc1,
-        p.pins.gpio4,
-        p.pins.gpio5,
-        p.pins.gpio6,
         p.pins.gpio7,
+        p.pins.gpio6,
+        p.pins.gpio5,
+        p.pins.gpio4,
     )?;
     let mut relay = relay::Relay::new(p.pins.gpio21.downgrade_output())?;
 
@@ -120,6 +127,7 @@ fn main() -> Result<()> {
     let mut press: Option<Press> = None;
     let mut checkpointed: Option<Minutes> = None;
     let mut shown: Option<View> = None;
+    let boot = Instant::now();
 
     loop {
         let now = Instant::now();
@@ -206,6 +214,15 @@ fn main() -> Result<()> {
 
         let minutes = minutes_now();
         let lamp_on = lamp.update(minutes);
+
+        // Status LED: solid when the clock is trusted, 1 Hz blink when it
+        // is unset or restored after a power cut — the same two states the
+        // screen warns about, readable from across the room.
+        let trusted = minutes.is_some() && clock::trust() != Trust::Restored;
+        let lit = trusted || (boot.elapsed().as_millis() / 500) % 2 == 0;
+        if let Err(e) = if lit { led.set_high() } else { led.set_low() } {
+            error!("status LED failed: {e:#}");
+        }
 
         // Relay state always follows the lamp logic, whatever changed it.
         if relay.is_on() != lamp_on {

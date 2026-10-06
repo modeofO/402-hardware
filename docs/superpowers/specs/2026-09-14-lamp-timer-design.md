@@ -24,8 +24,11 @@ suppression, input debounce) so no mains wiring is exposed anywhere.
 
 ## Wiring
 
-Display and touch: unchanged from the vending terminal, see
-`docs/hardware-notes.md` and `firmware/src/pins.rs`.
+Display and touch are on the carrier board (`designer/projects/lamp-timer`),
+whose routing set the assignment in `firmware/src/pins.rs`: SCK 10, MOSI 11,
+CS 12, DC 14, RST 47, Lite 48; touch YP 7, XP 6, YM 5, XM 4. The breadboard
+prototype used 12/11/10/9/14 and 4/5/6/7. Bring-up findings that still hold
+(SPI mode jumper, no MISO, manual CS) are in `docs/hardware-notes.md`.
 
 ### ESP32-S3 → IoT Power Relay
 
@@ -33,6 +36,10 @@ Display and touch: unchanged from the vending terminal, see
 |--------------|--------------------|------|
 | GPIO 21 | trigger `+` | 3.3V logic is inside the 3–60V DC input range |
 | GND | trigger `-` | |
+
+On the carrier these are the 2-pin screw terminal J3 (`+` marked). The
+carrier also has a status LED on GPIO 45: solid when the clock is trusted,
+blinking while it is unset or was restored after a power cut.
 
 Lamp plugs into one of the **"normally OFF"** outlets. GPIO high = lamp on.
 The ESP32 runs from USB-C; the IoT Relay's "always on" outlet can feed the

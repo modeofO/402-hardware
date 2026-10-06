@@ -4,6 +4,9 @@
 //!
 //! Expected at the display pins: CLK, MOSI, CS, D/C, RST all alternating
 //! ~0V / ~3.3V every second. Any pin that sits still is the broken path.
+//! On the carrier board, probe the J2 socket (pin 1 = GND): CLK is pin 4,
+//! MOSI 6, CS 7, D/C 8, RST 9 — the 2050's JP2 order. The status LED
+//! blinks along, so the program is visibly running before any probing.
 
 use esp_idf_svc::hal::gpio::{OutputPin, PinDriver};
 use esp_idf_svc::hal::prelude::*;
@@ -14,27 +17,30 @@ fn main() -> anyhow::Result<()> {
     esp_idf_svc::log::EspLogger::initialize_default();
 
     let p = Peripherals::take()?;
+    // Carrier-board pin map (pins.rs), plus the status LED so a bare board
+    // with no display fitted still shows the program is running.
     let mut pins = [
         (
-            "CLK/12",
-            PinDriver::output(p.pins.gpio12.downgrade_output())?,
+            "CLK/10",
+            PinDriver::output(p.pins.gpio10.downgrade_output())?,
         ),
         (
             "MOSI/11",
             PinDriver::output(p.pins.gpio11.downgrade_output())?,
         ),
         (
-            "CS/10",
-            PinDriver::output(p.pins.gpio10.downgrade_output())?,
+            "CS/12",
+            PinDriver::output(p.pins.gpio12.downgrade_output())?,
         ),
-        ("DC/9", PinDriver::output(p.pins.gpio9.downgrade_output())?),
+        ("DC/14", PinDriver::output(p.pins.gpio14.downgrade_output())?),
         (
-            "RST/14",
-            PinDriver::output(p.pins.gpio14.downgrade_output())?,
+            "RST/47",
+            PinDriver::output(p.pins.gpio47.downgrade_output())?,
         ),
+        ("LED/45", PinDriver::output(p.pins.gpio45.downgrade_output())?),
     ];
 
-    info!("pin_blink: toggling CLK=12 MOSI=11 CS=10 DC=9 RST=14 at ~0.5Hz");
+    info!("pin_blink: toggling CLK=10 MOSI=11 CS=12 DC=14 RST=47 LED=45 at ~0.5Hz");
     let mut level = false;
     loop {
         level = !level;
